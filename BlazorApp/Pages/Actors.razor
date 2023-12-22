@@ -1,0 +1,136 @@
+﻿@using BlazorApp.Data
+@using Microsoft.EntityFrameworkCore;
+@using System.Text.RegularExpressions;
+@using System.Text;
+@inject NavigationManager NavigationManager
+@page "/actors/{actorName?}"
+
+<h3>Actors</h3>
+
+<h2>Поиск актеров</h2>
+
+<div class="searchSection">
+    <input id="sQuery" type="text" @bind="searchQuery" placeholder="Ищем актёра или режиссёра..." required="true">
+    <button id="mainButton" @onclick="SearchActors">Искать</button>
+</div>
+
+<style>
+    #sQuery {
+        width: 80%;
+    }
+
+    .movie-link {
+        cursor: pointer;
+    }
+</style>
+
+
+@* @if (true) //actorName != null
+{
+    //searchQuery = OnInitialized();
+    OnInitialized();
+    setSQ(linkk);
+} *@
+
+@if (actorName != null && actorName != "")
+{
+    if (actorName == "/emptyPage")
+    {
+        <h4>Человек не найден</h4>
+    }
+    else
+    {
+        using (ApplicationContext db = new ApplicationContext(false))
+        {
+            if (searchQuery == "" || searchQuery == null)
+            {
+                OnInitialized();
+                setSQ(linkk);
+            }
+            string? actorID = db.Actors //вытащили ID актера по имени
+                     .Where(a => a.Name == searchQuery)
+                     .Select(a => a.ID)
+                     .FirstOrDefault();
+            if (actorID != null)
+            {
+                var movies = db.Movies
+                        .Include(m => m.Titles)
+                        .Where(m => m.Actors.Any(a => a.ID == actorID))
+                        .ToList();
+                /*StringBuilder acM = new StringBuilder();
+                foreach (var m in movies)
+                {
+                    acM.Append($"{db.MovieTitles.FirstOrDefault(mt => mt.MovieId == m.ID)?.Title}, ");
+                }
+                int l = acM.Length;
+                if (l > 0)
+                    acM.Remove(l - 2, 2);*/
+
+
+                <h3>Имя: @searchQuery</h3>
+                <p>Фильмы: 
+                    <ul>
+                    @foreach (var movie in movies)
+                    {
+                        if (movie != null)
+                        {
+                            string title = movie.Titles.First().Title;
+                            string lin = $"/movie/{title.Replace(" ", "_")}";
+                            <li><a class="movie-link" href=@lin>@title</a></li>
+                        }
+                    }
+                    </ul>
+                    @* @acM *@
+                </p>
+            }
+            else
+            {
+                <h4>Человек не найден </h4>
+            }
+        }
+    }
+}
+
+
+@code {
+    [Parameter]
+    public string actorName { get; set; } = "";
+
+    private string searchQuery = "";
+    public string linkk = "/actors";
+    string pattern = @"/actors/(?<actorName>[\w-]+)?";
+
+    public void setSQ(string link)
+    {
+        if (link != "/actors")
+        {
+            //searchQuery = tagName;
+
+            Match match = Regex.Match(link, pattern);
+            searchQuery = match.Groups["actorName"].Value.Replace("_", " ");
+        }
+    }
+    protected override void OnInitialized()
+    {
+        string currentPage = NavigationManager.Uri;
+        linkk = currentPage;
+    }
+    public void SearchActors()
+    {
+
+        if (searchQuery != null)
+        {
+            //+ проверка того, что в бд действительно есть такой чел
+            NavigationManager.NavigateTo($"/actors/{searchQuery.Replace(" ", "_")}");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/actors/emptyPage");
+        }
+    }
+    public void ClickNavigate(string title, string link)
+    {
+        NavigationManager.NavigateTo(link);
+        searchQuery = title;
+    }
+}

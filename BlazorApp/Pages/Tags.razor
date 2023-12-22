@@ -1,0 +1,146 @@
+﻿@using BlazorApp.Data
+@using Microsoft.EntityFrameworkCore;
+@using System.Text.RegularExpressions;
+@using Microsoft.AspNetCore.Components;
+@using System.Text;
+@inject NavigationManager NavigationManager
+@page "/tags/{tagName?}"
+
+<h3>Tags</h3>
+
+<h2>Поиск актеров</h2>
+
+<div class="searchSection">
+    <input id="sQuery" type="text" @bind="searchQuery" placeholder="Ищем тэг..." required="true">
+    <button id="mainButton" @onclick="SearchTags">Искать</button>
+</div>
+
+<style>
+    #sQuery {
+        width: 80%;
+    }
+
+
+    .movie-link {
+        cursor: pointer;
+    }
+</style>
+
+
+@* @if (tagName != null)
+{
+    //searchQuery = OnInitialized();
+    OnInitialized();
+    setSQ(linkk);
+} *@
+
+
+@if (tagName != null && tagName != "")
+{
+    if (tagName == "/emptyPage")
+    {
+        <h4>Тэг не найден</h4>
+    }
+    else
+    {
+        using (ApplicationContext db = new ApplicationContext(false))
+        {
+            if (searchQuery == "" || searchQuery == null)
+            {
+                OnInitialized();
+                setSQ(linkk);
+            }
+            string? tagID = db.Tags //вытащили ID актера по имени
+                .Where(a => a.Name == searchQuery)
+                .Select(a => a.ID)
+                .FirstOrDefault();
+            if (tagID != null)
+            {
+                var movies = db.Movies
+                    .Include(m => m.Titles)
+                    .Where(m => m.Tags.Any(a => a.ID == tagID))
+                    .ToList();
+                /*StringBuilder tagM = new StringBuilder();
+                foreach (var m in movies)
+                {
+                    tagM.Append($"{db.MovieTitles.FirstOrDefault(mt => mt.MovieId == m.ID)?.Title}, ");
+                }
+
+                int l = tagM.Length;
+                if (l > 0)
+                    tagM.Remove(l - 2, 2);*/
+
+
+
+
+                <h3>Название: @searchQuery</h3>
+                <p>Фильмы:
+                    <ul>
+                        @foreach (var movie in movies)
+                        {
+                            if (movie != null)
+                            {
+                                string title = movie.Titles.First().Title;
+                                string lin = $"/movie/{title.Replace(" ", "_")}";
+                                <li><a class="movie-link" href=@lin>@title</a></li>
+                            }
+                        }
+                    </ul>
+                    @* @tagM *@
+                </p>
+            }
+        }
+    }
+}
+
+
+@code {
+    [Parameter]
+    public string tagName { get; set; } = "";
+
+    private string searchQuery = "";
+
+    public string linkk = "/tags";
+
+    string pattern = @"/tags/(?<tagName>[\w-]+)?";
+
+    public void setSQ(string link)
+    {
+        if (link != "/tags")
+        {
+            //searchQuery = tagName;
+
+            Match match = Regex.Match(link, pattern);
+            searchQuery = match.Groups["tagName"].Value.Replace("_", " ");
+        }
+    }
+
+
+    protected override void OnInitialized()
+    {
+        string currentPage = NavigationManager.Uri;
+        linkk = currentPage;
+    }
+
+
+
+    public void SearchTags()
+    {
+
+        if (searchQuery != null)
+        {
+            //+ проверка того, что в бд действительно есть такой чел
+            NavigationManager.NavigateTo($"/tags/{searchQuery.Replace(" ", "_")}");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/tags/emptyPage");
+        }
+    }
+    public void ClickNavigate(string title, string link)
+    {
+        NavigationManager.NavigateTo(link);
+        searchQuery = title;
+    }
+}
+

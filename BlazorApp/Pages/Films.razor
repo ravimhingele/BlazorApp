@@ -1,0 +1,263 @@
+﻿@using BlazorApp.Data
+@using Microsoft.EntityFrameworkCore;
+@using System.Text.RegularExpressions;
+@using System.Text;
+@using System.Net;
+@inject NavigationManager NavigationManager
+@page "/movie/{movieTitle?}"
+
+<h3>Films</h3>
+
+<h2>Поиск по фильмам</h2>
+
+<div class="searchSection">
+    <input id="sQuery" type="text" @bind="searchQuery" placeholder="Ищем фильм..." required="true">
+    <button id="mainButton" @onclick="SearchMovies">Искать</button>
+</div>
+
+<style>
+    #sQuery {
+        width: 80%;
+    }
+
+    .movie-link {
+        cursor: pointer;
+    }
+</style>
+
+
+@if (movieTitle != null && movieTitle != "")
+{
+    if (movieTitle == "/emptyPage")
+    {
+        <h4>Фильм не найден</h4>
+    }
+    else
+    {
+        using (ApplicationContext db = new ApplicationContext(false))
+        {
+            if (searchQuery == "" || searchQuery == null)
+            {
+                OnInitialized();
+                setSQ(linkk);
+            }
+            string? movieID = db.MovieTitles //вытащили ID фильма по названию
+                    .Where(m => m.Title == searchQuery)
+                    .Select(m => m.MovieId)
+                    .FirstOrDefault();
+
+            var movie = db.Movies
+                    .Include(m => m.Actors)
+                    .Include(m => m.Tags)
+                    .Include(m => m.Titles)
+                    .FirstOrDefault(m => m.ID == movieID);
+            if (movie != null)
+            {
+
+
+
+                var actors = movie?.Actors;
+                StringBuilder aN = new StringBuilder();
+                foreach (var actor in actors)
+                {
+                    aN.Append($"{actor.Name}, ");
+                }
+                int l = aN.Length;
+                if (l > 0)
+                    aN.Remove(l - 2, 2);
+
+                var tags = movie?.Tags;
+                /*List<Tag> ts = new List<Tag>();
+                foreach (var tag in tags)
+                {
+                    ts.Add(tag);
+                    //tgN.Append($"{tag.Name}, ");
+                }*/
+                
+                
+                /*StringBuilder tgN = new StringBuilder();
+                foreach (var tag in tags)
+                {
+                    tgN.Append($"{tag.Name}, ");
+                }
+                l = tgN.Length;
+                if (l > 0)
+                    tgN.Remove(l - 2, 2);*/
+
+                var director = db.Movies
+                .Where(m => m.ID == movieID)
+                .Select(m => m.Director)
+                .FirstOrDefault();
+
+                string? movieRating = db.Movies
+                .Where(m => m.ID == movieID)
+                .Select(m => m.Rating)
+                .FirstOrDefault();
+
+                
+
+                
+                <h3>Название: @searchQuery</h3>
+
+                FindImage(movieID);
+                <img src=@image width="200">
+
+                GetDescription(movieID);
+
+                <p><b>Описание:</b> @summary</p>
+
+                <p><b>Оценка зрителей:</b> @r</p>
+                <p>
+                    <b>Режиссёр:</b>
+                    @if (director != null)
+                    {
+                        string name = director.Name;
+                        string lin = $"/actors/{name.Replace(" ", "_")}";
+                        @* <a class="movie-link" @onclick="() => ClickNavigate(name, lin)">@name</a> *@
+                        <a class="movie-link" href=@lin>@name</a>
+                    }
+                    @* @directorName *@
+                </p>
+                <p>
+                    <b>Актеры:</b>
+                    <ul>
+                    @if (actors != null)
+                    {
+                        foreach (var actor in actors)
+                        {
+                            string name = actor.Name;
+                            string lin = $"/actors/{name.Replace(" ", "_")}";
+                            //<li><a class="movie-link" @onclick="() => ClickNavigate(name, lin)">@name</a></li>
+                            <li><a class="movie-link" href=@lin>@name</a></li>
+                        }
+                    }
+                    </ul>
+
+                    @* @aN *@</p>
+                <p>
+                    <b>Тэги:</b>
+                    @* @tgN *@
+                    </p>
+                <ul>
+                @if (movie.Tags != null)
+                {
+                    foreach (var tag in tags)
+                    {
+                        string name = tag.Name;
+                        string lin = $"/tags/{name.Replace(" ", "_")}";
+                        <li><a class="movie-link" href=@lin>@name</a></li>
+                        //<a href="@lin">@name</a>
+                        
+                        //<li><a class="movie-link" @onclick="() => ClickNavigate(name, lin)">@name</a></li>
+                        //ts.Add(tag);
+                        //tgN.Append($"{tag.Name}, ");
+                    }
+                }
+                </ul>
+                <p>
+                    <b>Похожие фильмы:</b>
+                    <ol>
+                        @if (movie.Top10Codes != "")
+                        {
+                            foreach (string movieCode in movie.Top10Codes.Split(", "))
+                            {
+                                Movie mov = db.Movies.Include(m => m.Titles).FirstOrDefault(m => m.ID == movieCode);
+                                if (mov != null)
+                                {
+                                    string title = mov.Titles.First().Title;
+                                    string lin = $"/movie/{title.Replace(" ", "_")}";
+                                    <li><a class="movie-link" @onclick="() => ClickNavigate(title, lin)">@title</a></li>
+                                }
+                            }
+                        }
+                    </ol>
+                </p>
+            }
+            else
+            {
+                <h4>Фильм не найден( </h4>
+            }
+        }
+    } 
+}
+
+@code {
+    [Parameter]
+    public string movieTitle { get; set; } = "";
+
+    public string linkk = "/movie";
+    string pattern = @"/movie/(?<movieTitle>[\w-]+)?";
+
+    private string searchQuery = "";
+
+    public string image, summary, r;
+    string keyAPI = "ffdcb5d6";
+
+    public void setSQ(string link)
+    {
+        if (link != "/movie")
+        {
+            //searchQuery = tagName;
+
+            Match match = Regex.Match(link, pattern);
+            searchQuery = match.Groups["movieTitle"].Value.Replace("_", " ");
+        }
+    }
+
+    protected void FindImage(string id)
+    {
+        using (WebClient client = new WebClient())
+        {
+            //string keyAPI = "ffdcb5d6";
+            string link = $"http://www.omdbapi.com/?i={id}&apikey={keyAPI}";
+            string info = client.DownloadString(link);
+            int start = info.IndexOf("Poster") + 9;
+            int end = info.IndexOf("Ratings") - 3;
+            image = info.Substring(start, end - start);
+        }
+    }
+
+    protected void GetDescription(string id)
+    {
+        using (WebClient client = new WebClient())
+        {
+            
+            string link = $"http://www.omdbapi.com/?i={id}&apikey={keyAPI}";
+            string info = client.DownloadString(link);
+            int startSum = info.IndexOf("Plot") + 7;
+            int endSum = info.IndexOf("Language") - 3;
+            summary = info.Substring(startSum, endSum - startSum);
+            int startR = info.IndexOf("imdbRating") + 13;
+            int endR = info.IndexOf("imdbVotes") - 3;
+            r = info.Substring(startR, endR - startR);
+        }
+    }
+
+    
+
+    protected override void OnInitialized()
+    {
+        string currentPage = NavigationManager.Uri;
+        linkk = currentPage;
+    }
+
+    public void SearchMovies()
+    {
+
+        if (searchQuery != null)
+        {
+
+            NavigationManager.NavigateTo($"/movie/{searchQuery.Replace(" ", "_")}");
+        }
+        else
+        {
+            NavigationManager.NavigateTo("/movie/emptyPage");
+        }
+
+    }
+    public void ClickNavigate(string title, string link)
+    {
+        NavigationManager.NavigateTo(link);
+        searchQuery = title;
+    }
+}
